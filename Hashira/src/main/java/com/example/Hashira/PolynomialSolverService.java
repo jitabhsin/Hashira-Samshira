@@ -1,7 +1,5 @@
 package com.example.Hashira;
 
-
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -12,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,34 +46,62 @@ public class PolynomialSolverService {
                 points.put(x, y);
             }
 
-            List<Map.Entry<Integer, BigInteger>> selectedPoints = new ArrayList<>(points.entrySet()).subList(0, k);
+            List<Map.Entry<Integer, BigInteger>> allPoints = new ArrayList<>(points.entrySet());
+            List<List<Map.Entry<Integer, BigInteger>>> combinations = new ArrayList<>();
+            generateCombinations(allPoints, k, 0, new ArrayList<>(), combinations);
 
-            BigInteger totalNumerator = BigInteger.ZERO;
-            BigInteger totalDenominator = BigInteger.ONE;
+            Map<BigInteger, Integer> secretCounts = new HashMap<>();
+            BigInteger secret = null;
+            int maxCount = 0;
 
-            for (int i = 0; i < k; i++) {
-                BigInteger num = selectedPoints.get(i).getValue();
-                BigInteger den = BigInteger.ONE;
+            for (List<Map.Entry<Integer, BigInteger>> selectedPoints : combinations) {
+                BigInteger totalNumerator = BigInteger.ZERO;
+                BigInteger totalDenominator = BigInteger.ONE;
 
-                for (int j = 0; j < k; j++) {
-                    if (i != j) {
-                        BigInteger xi = BigInteger.valueOf(selectedPoints.get(i).getKey());
-                        BigInteger xj = BigInteger.valueOf(selectedPoints.get(j).getKey());
+                for (int i = 0; i < k; i++) {
+                    BigInteger num = selectedPoints.get(i).getValue();
+                    BigInteger den = BigInteger.ONE;
 
-                        num = num.multiply(xj.negate());
-                        den = den.multiply(xi.subtract(xj));
+                    for (int j = 0; j < k; j++) {
+                        if (i != j) {
+                            BigInteger xi = BigInteger.valueOf(selectedPoints.get(i).getKey());
+                            BigInteger xj = BigInteger.valueOf(selectedPoints.get(j).getKey());
+
+                            num = num.multiply(xj.negate());
+                            den = den.multiply(xi.subtract(xj));
+                        }
+                    }
+                    
+                    totalNumerator = totalNumerator.multiply(den).add(num.multiply(totalDenominator));
+                    totalDenominator = totalDenominator.multiply(den);
+                }
+
+                if (totalNumerator.remainder(totalDenominator).equals(BigInteger.ZERO)) {
+                    BigInteger currentSecret = totalNumerator.divide(totalDenominator);
+                    int count = secretCounts.getOrDefault(currentSecret, 0) + 1;
+                    secretCounts.put(currentSecret, count);
+                    if (count > maxCount) {
+                        maxCount = count;
+                        secret = currentSecret;
                     }
                 }
-                
-                totalNumerator = totalNumerator.multiply(den).add(num.multiply(totalDenominator));
-                totalDenominator = totalDenominator.multiply(den);
             }
-
-            BigInteger secret = totalNumerator.divide(totalDenominator);
 
             System.out.println("\n=======================================================");
             System.out.println("  SUCCESS! THE DECODED SECRET VALUE IS: " + secret);
             System.out.println("=======================================================\n");
+        }
+    }
+
+    private void generateCombinations(List<Map.Entry<Integer, BigInteger>> allPoints, int k, int start, List<Map.Entry<Integer, BigInteger>> current, List<List<Map.Entry<Integer, BigInteger>>> combinations) {
+        if (current.size() == k) {
+            combinations.add(new ArrayList<>(current));
+            return;
+        }
+        for (int i = start; i < allPoints.size(); i++) {
+            current.add(allPoints.get(i));
+            generateCombinations(allPoints, k, i + 1, current, combinations);
+            current.remove(current.size() - 1);
         }
     }
 }
